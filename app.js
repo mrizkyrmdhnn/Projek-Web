@@ -120,6 +120,11 @@ dropZone.addEventListener('drop', (e) => {
 // ─── BUTTONS ─────────────────────────────────────────
 btnRender.addEventListener('click', renderCharts);
 
+// Auto-render saat dropdown berubah
+labelColSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
+valueColSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
+chartTypeSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
+
 btnReset.addEventListener('click', () => {
   parsedData = [];
   columns    = [];
