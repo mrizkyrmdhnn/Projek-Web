@@ -1,0 +1,13 @@
+{
+  "name": "csv-data-visualizer",
+  "version": "1.0.0",
+  "description": "Visualisasi data CSV dan XLSX menggunakan Chart.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["csv", "xlsx", "visualisasi", "chartjs"],
+  "author": "",
+  "license": "MIT"
+}
