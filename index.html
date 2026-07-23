@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Data Visualizer</title>
+  <meta name="description"
+    content="Visualisasi data CSV secara interaktif menggunakan Bar Chart, Line Chart, dan Pie Chart berbasis Chart.js." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="container">
+      <div class="header-inner">
+        <div class="brand">
+          <div>
+            <h1 class="brand-title">Pengvisualisasi Datamu</h1>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- UPLOAD SECTION -->
+  <main class="main">
+    <div class="container">
+
+      <section class="upload-section" id="uploadSection">
+        <div class="upload-card" id="dropZone">
+          <div class="upload-icon-wrap">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+          </div>
+          <h2 class="upload-title">Unggah File</h2>
+          <p class="upload-desc">Seret dan lepas file ke sini, atau klik tombol di bawah</p>
+          <p class="upload-hint">Format yang didukung .csv dan .xlsx</p>
+          <label class="btn-upload" for="csvInput">Unggah File</label>
+          <input type="file" id="csvInput"
+            accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+        </div>
+      </section>
+
+      <!-- COLUMN SELECTOR -->
+      <section class="control-section hidden" id="controlSection">
+        <div class="control-card">
+          <h3 class="control-title">Konfigurasi Data</h3>
+          <div class="control-grid">
+            <div class="control-field">
+              <label class="field-label" for="labelCol">Kolom Label (Sumbu X / Kategori)</label>
+              <select class="field-select" id="labelCol"></select>
+            </div>
+            <div class="control-field">
+              <label class="field-label" for="valueCol">Kolom Nilai (Sumbu Y / Data)</label>
+              <select class="field-select" id="valueCol"></select>
+            </div>
+            <div class="control-field">
+              <label class="field-label" for="chartType">Tipe Grafik</label>
+              <select class="field-select" id="chartType">
+                <option value="all">Tampilkan Semua Grafik</option>
+                <option value="bar">Bar Chart saja</option>
+                <option value="line">Line Chart saja</option>
+                <option value="pie">Pie Chart saja</option>
+              </select>
+            </div>
+            <div class="control-actions">
+              <button class="btn-primary" id="btnRender">Buat Grafik</button>
+              <button class="btn-secondary" id="btnReset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATS SUMMARY -->
+      <section class="stats-section hidden" id="statsSection">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Baris</div>
+            <div class="stat-value" id="statRows">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Kolom</div>
+            <div class="stat-value" id="statCols">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Nilai Tertinggi</div>
+            <div class="stat-value" id="statMax">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Nilai Terendah</div>
+            <div class="stat-value" id="statMin">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Rata-rata</div>
+            <div class="stat-value" id="statAvg">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total</div>
+            <div class="stat-value" id="statSum">-</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CHARTS AREA -->
+      <section class="charts-area hidden" id="chartsArea">
+
+        <div class="chart-row" id="rowBarLine">
+          <!-- BAR CHART -->
+          <div class="chart-card" id="wrapBar">
+            <div class="chart-card-header">
+              <div>
+                <h3 class="chart-card-title">Bar Chart</h3>
+                <p class="chart-card-desc">Perbandingan nilai antar kategori</p>
+              </div>
+              <button class="btn-download" id="btnDlBar" title="Unduh gambar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                  <path fill-rule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
+                </svg>
+                Unduh
+              </button>
+            </div>
+            <div class="chart-canvas-wrap">
+              <canvas id="barChart"></canvas>
+            </div>
+          </div>
+
+          <!-- LINE CHART -->
+          <div class="chart-card" id="wrapLine">
+            <div class="chart-card-header">
+              <div>
+                <h3 class="chart-card-title">Line Chart</h3>
+                <p class="chart-card-desc">Tren data dari waktu ke waktu</p>
+              </div>
+              <button class="btn-download" id="btnDlLine" title="Unduh gambar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                  <path fill-rule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
+                </svg>
+                Unduh
+              </button>
+            </div>
+            <div class="chart-canvas-wrap">
+              <canvas id="lineChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- PIE CHART -->
+        <div class="chart-row chart-row-single" id="rowPie">
+          <div class="chart-card chart-card-pie" id="wrapPie">
+            <div class="chart-card-header">
+              <div>
+                <h3 class="chart-card-title">Pie Chart</h3>
+                <p class="chart-card-desc">Proporsi setiap kategori terhadap total</p>
+              </div>
+              <button class="btn-download" id="btnDlPie" title="Unduh gambar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                  <path fill-rule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
+                </svg>
+                Unduh
+              </button>
+            </div>
+            <div class="chart-canvas-wrap chart-canvas-wrap--pie">
+              <canvas id="pieChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- DATA TABLE PREVIEW -->
+      <section class="table-section hidden" id="tableSection">
+        <div class="table-card">
+          <div class="table-header">
+            <h3 class="table-title">Pratinjau Data</h3>
+            <span class="table-badge" id="tableBadge">0 baris</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="dataTable">
+              <thead id="tableHead"></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <p>CSV Data Visualizer &mdash; Powered by Chart.js</p>
+    </div>
+  </footer>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
