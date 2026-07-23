@@ -24,9 +24,9 @@ body {
 /* === LAYOUT === */
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 32px;
 }
 
 .main {
@@ -325,14 +325,14 @@ body {
 
 /* === CHARTS AREA === */
 .charts-area {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .chart-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .chart-row-single {
@@ -342,17 +342,17 @@ body {
 .chart-card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 14px;
+  padding: 28px 32px;
   transition: box-shadow 0.2s;
 }
 
 .chart-card:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
 }
 
 .chart-card-pie {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
   width: 100%;
 }
@@ -362,14 +362,16 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
 }
 
 .chart-card-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: #111827;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .chart-card-desc {
@@ -388,10 +390,11 @@ body {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 7px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   cursor: pointer;
   transition: background 0.18s, color 0.18s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-download:hover {
@@ -399,16 +402,21 @@ body {
   color: #374151;
 }
 
+/* Canvas wrappers — height dikontrol CSS, Chart.js mengisi penuh */
 .chart-canvas-wrap {
   position: relative;
   width: 100%;
-  min-height: 260px;
+  height: 420px;
+}
+
+.chart-canvas-wrap canvas {
+  display: block;
 }
 
 .chart-canvas-wrap--pie {
-  max-width: 380px;
+  max-width: 500px;
   margin: 0 auto;
-  min-height: 320px;
+  height: 460px;
 }
 
 /* === DATA TABLE === */
@@ -566,9 +574,28 @@ body {
 }
 
 /* === RESPONSIVE === */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .chart-row {
     grid-template-columns: 1fr;
+  }
+
+  .chart-canvas-wrap {
+    height: 360px;
+  }
+
+  .chart-canvas-wrap--pie {
+    height: 380px;
+    max-width: 100%;
+  }
+
+  .chart-card-pie {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
   }
 
   .control-grid {
@@ -587,12 +614,8 @@ body {
     padding: 40px 20px;
   }
 
-  .chart-card-pie {
-    max-width: 100%;
-  }
-
-  .chart-canvas-wrap--pie {
-    max-width: 280px;
+  .chart-card {
+    padding: 20px 20px;
   }
 }
 
@@ -601,7 +624,11 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .container {
-    padding: 0 16px;
+  .chart-canvas-wrap {
+    height: 280px;
+  }
+
+  .chart-canvas-wrap--pie {
+    height: 300px;
   }
 }

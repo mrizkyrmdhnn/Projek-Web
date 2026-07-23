@@ -470,7 +470,7 @@ function renderCharts() {
 function buildBarLineOptions(labelCol, valueCol, type) {
   return {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     animation: {
       duration: 750,
       easing: 'easeOutQuart',
@@ -542,7 +542,7 @@ function buildBarLineOptions(labelCol, valueCol, type) {
 function buildPieOptions(valueCol) {
   return {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     animation: {
       animateRotate: true,
       animateScale: true,
