@@ -320,10 +320,10 @@ function buildTable() {
 }
 
 // ─── RENDER STATS ────────────────────────────────────
-function renderStats(valCol) {
-  const values = parsedData
-    .map((r) => parseFloat(r[valCol]))
-    .filter((v) => !isNaN(v));
+function renderStats(valCol, overrideValues = null) {
+  const values = overrideValues
+    ? overrideValues.filter((v) => !isNaN(v))
+    : parsedData.map((r) => parseFloat(r[valCol])).filter((v) => !isNaN(v));
 
   statRows.textContent = parsedData.length.toLocaleString('id-ID');
   statCols.textContent = columns.length;
@@ -362,16 +362,33 @@ function renderCharts() {
     return;
   }
 
-  // Extract labels & values
-  const labels = parsedData.map((r) => r[labelCol] ?? '');
-  const values = parsedData.map((r) => parseFloat(r[valueCol]));
+  // ── Deteksi apakah kolom nilai numerik ──
+  const rawValues  = parsedData.map((r) => r[valueCol]);
+  const numParsed  = rawValues.map((v) => parseFloat(v));
+  const numericCount = numParsed.filter((v) => !isNaN(v)).length;
+  const isNumeric  = numericCount / rawValues.length >= 0.5;
 
-  if (values.every(isNaN)) {
-    showToast('Kolom nilai tidak mengandung data numerik');
-    return;
+  let labels, values, yAxisLabel;
+
+  if (isNumeric) {
+    // Mode normal: gunakan nilai kolom langsung
+    labels     = parsedData.map((r) => String(r[labelCol] ?? ''));
+    values     = numParsed;
+    yAxisLabel = valueCol;
+  } else {
+    // Mode frekuensi: hitung kemunculan setiap nilai pada kolom label
+    const freq = {};
+    parsedData.forEach((r) => {
+      const key = String(r[labelCol] ?? '(kosong)');
+      freq[key] = (freq[key] || 0) + 1;
+    });
+    labels     = Object.keys(freq);
+    values     = Object.values(freq);
+    yAxisLabel = 'Jumlah';
+    showToast(`Mode frekuensi: menghitung kemunculan "${labelCol}"`);
   }
 
-  renderStats(valueCol);
+  renderStats(valueCol, isNumeric ? null : values);
   destroyAllCharts();
   show(chartsArea);
 
@@ -413,7 +430,7 @@ function renderCharts() {
       data: {
         labels,
         datasets: [{
-          label: valueCol,
+          label: yAxisLabel,
           data: values,
           backgroundColor: barBg,
           borderColor: barBorder,
@@ -422,7 +439,7 @@ function renderCharts() {
           borderSkipped: false,
         }],
       },
-      options: buildBarLineOptions(labelCol, valueCol, 'bar'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar'),
     });
   }
 
@@ -433,7 +450,7 @@ function renderCharts() {
       data: {
         labels,
         datasets: [{
-          label: valueCol,
+          label: yAxisLabel,
           data: values,
           borderColor: singleColor,
           backgroundColor: hexAlpha(singleColor, 0.1),
@@ -447,7 +464,7 @@ function renderCharts() {
           tension: 0.38,
         }],
       },
-      options: buildBarLineOptions(labelCol, valueCol, 'line'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'line'),
     });
   }
 
@@ -458,7 +475,7 @@ function renderCharts() {
       data: {
         labels,
         datasets: [{
-          label: valueCol,
+          label: yAxisLabel,
           data: values,
           backgroundColor: colors.map((c) => hexAlpha(c, 0.85)),
           borderColor: colors,
@@ -466,7 +483,7 @@ function renderCharts() {
           hoverOffset: 10,
         }],
       },
-      options: buildPieOptions(valueCol),
+      options: buildPieOptions(yAxisLabel),
     });
   }
 }
