@@ -477,8 +477,8 @@ function renderCharts() {
 
   // ── BAR CHART ──
   if (showBar) {
-    // Maks 10 bar tampil; item ke-11+ ATAU persentase < 20% masuk "Lainnya"
-    const barData = groupSmallSlices(labels, values, 10, 20);
+    // Maks 10 bar; item ke-11+ ATAU persentase < 10% dari total masuk "Lainnya"
+    const barData = groupSmallSlices(labels, values, 10, 10);
     if (barData.grouped) {
       showToast(`${barData.groupedCount} kategori digabung ke “Lainnya”`);
     }
@@ -604,7 +604,12 @@ function buildBarOptions(labelCol, valueCol, dataCount = 10) {
       tooltip: {
         callbacks: {
           title: (items) => items[0].label,
-          label: (item) => ` ${valueCol}: ${formatNumber(item.raw)}`,
+          label: (item) => {
+            const dataset = item.dataset;
+            const total   = dataset.data.reduce((a, b) => a + b, 0);
+            const pct     = total ? ((item.raw / total) * 100).toFixed(1) : 0;
+            return ` ${valueCol}: ${formatNumber(item.raw)}  (${pct}%)`;
+          },
         },
       },
     },
