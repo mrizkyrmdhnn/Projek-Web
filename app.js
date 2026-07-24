@@ -351,6 +351,40 @@ function renderStats(valCol, overrideValues = null) {
   });
 }
 
+// ─── GROUP SMALL SLICES → "Lainnya" ─────────────────
+/**
+ * Menggabungkan data dengan persentase kecil menjadi satu grup "Lainnya".
+ * @param {string[]} labels  - array label asli
+ * @param {number[]} values  - array nilai asli
+ * @param {number}   maxItems - jumlah maksimal item yang tampil (sisanya digabung)
+ * @returns {{ labels, values, grouped: boolean, groupedCount: number }}
+ */
+function groupSmallSlices(labels, values, maxItems = 15) {
+  const total = values.reduce((a, b) => a + b, 0);
+  if (!total || labels.length <= maxItems) {
+    return { labels: [...labels], values: [...values], grouped: false, groupedCount: 0 };
+  }
+
+  // Urutkan dari besar ke kecil
+  const indexed = labels.map((l, i) => ({ label: l, value: values[i] }));
+  indexed.sort((a, b) => b.value - a.value);
+
+  const main   = indexed.slice(0, maxItems);
+  const others = indexed.slice(maxItems);
+
+  const otherTotal = others.reduce((a, b) => a + b.value, 0);
+
+  const newLabels = main.map((d) => d.label);
+  const newValues = main.map((d) => d.value);
+
+  if (others.length > 0) {
+    newLabels.push(`Lainnya (${others.length} kategori)`);
+    newValues.push(otherTotal);
+  }
+
+  return { labels: newLabels, values: newValues, grouped: others.length > 0, groupedCount: others.length };
+}
+
 // ─── RENDER CHARTS ───────────────────────────────────
 function renderCharts() {
   const labelCol  = labelColSel.value;
@@ -363,27 +397,27 @@ function renderCharts() {
   }
 
   // ── Deteksi apakah kolom nilai numerik ──
-  const rawValues  = parsedData.map((r) => r[valueCol]);
-  const numParsed  = rawValues.map((v) => parseFloat(v));
+  const rawValues    = parsedData.map((r) => r[valueCol]);
+  const numParsed    = rawValues.map((v) => parseFloat(v));
   const numericCount = numParsed.filter((v) => !isNaN(v)).length;
-  const isNumeric  = numericCount / rawValues.length >= 0.5;
+  const isNumeric    = numericCount / rawValues.length >= 0.5;
 
   let labels, values, yAxisLabel;
 
   if (isNumeric) {
-    // Mode normal: gunakan nilai kolom langsung
     labels     = parsedData.map((r) => String(r[labelCol] ?? ''));
     values     = numParsed;
     yAxisLabel = valueCol;
   } else {
-    // Mode frekuensi: hitung kemunculan setiap nilai pada kolom label
     const freq = {};
     parsedData.forEach((r) => {
       const key = String(r[labelCol] ?? '(kosong)');
       freq[key] = (freq[key] || 0) + 1;
     });
-    labels     = Object.keys(freq);
-    values     = Object.values(freq);
+    // Urutkan dari besar ke kecil
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    labels     = sorted.map(([k]) => k);
+    values     = sorted.map(([, v]) => v);
     yAxisLabel = 'Jumlah';
     showToast(`Mode frekuensi: menghitung kemunculan "${labelCol}"`);
   }
@@ -392,18 +426,14 @@ function renderCharts() {
   destroyAllCharts();
   show(chartsArea);
 
-  // Determine which charts to show
   const showBar  = chartType === 'all' || chartType === 'bar';
   const showLine = chartType === 'all' || chartType === 'line';
   const showPie  = chartType === 'all' || chartType === 'pie';
 
-  // Semua chart tampil satu per baris (full width, stacked vertical)
   rowBarLine.style.display = (showBar || showLine) ? '' : 'none';
   wrapBar.style.display    = showBar  ? '' : 'none';
   wrapLine.style.display   = showLine ? '' : 'none';
   rowPie.style.display     = showPie  ? '' : 'none';
-
-  // Setiap chart mengambil lebar penuh (tidak ada grid 2 kolom)
   rowBarLine.style.gridTemplateColumns = '';
 
   // Animate chart cards
@@ -413,85 +443,103 @@ function renderCharts() {
     el.classList.add('animate-in');
   });
 
-  const colors      = PALETTE.slice(0, labels.length);
   const singleColor = PALETTE[0];
 
   // ── BAR CHART ──
   if (showBar) {
-    // Untuk banyak data: set min lebar canvas agar scrollable
-    const barCanvas = document.getElementById('barChart');
-    const minBarWidth = Math.max(labels.length * 52, barCanvas.parentElement.clientWidth);
-    barCanvas.style.width  = minBarWidth + 'px';
+    // Untuk banyak data: grup kecil → "Lainnya", sisanya scroll
+    const MAX_BAR = 30;
+    const barData = groupSmallSlices(labels, values, MAX_BAR);
+    if (barData.grouped) {
+      showToast(`Bar: ${barData.groupedCount} kategori kecil digabung ke "Lainnya"`);
+    }
+
+    const barCanvas   = document.getElementById('barChart');
+    const barW        = Math.max(barData.labels.length * 56, barCanvas.parentElement.clientWidth - 1);
+    barCanvas.style.width  = barW + 'px';
     barCanvas.style.height = '100%';
 
-    const barBg     = labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.85));
-    const barBorder = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+    const barBg     = barData.labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.82));
+    const barBorder = barData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
 
     chartInstances.bar = new Chart(barCanvas, {
       type: 'bar',
       data: {
-        labels,
+        labels: barData.labels,
         datasets: [{
           label: yAxisLabel,
-          data: values,
+          data: barData.values,
           backgroundColor: barBg,
           borderColor: barBorder,
           borderWidth: 2,
           borderRadius: 8,
           borderSkipped: false,
+          borderRadiusTopLeft: 8,
+          borderRadiusTopRight: 8,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar', labels.length),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar', barData.labels.length),
     });
   }
 
   // ── LINE CHART ──
   if (showLine) {
-    // Untuk banyak data: set min lebar canvas agar scrollable
-    const lineCanvas = document.getElementById('lineChart');
-    const minLineWidth = Math.max(labels.length * 52, lineCanvas.parentElement.clientWidth);
-    lineCanvas.style.width  = minLineWidth + 'px';
+    const MAX_LINE = 40;
+    const lineData = groupSmallSlices(labels, values, MAX_LINE);
+
+    const lineCanvas  = document.getElementById('lineChart');
+    const lineW       = Math.max(lineData.labels.length * 56, lineCanvas.parentElement.clientWidth - 1);
+    lineCanvas.style.width  = lineW + 'px';
     lineCanvas.style.height = '100%';
 
     chartInstances.line = new Chart(lineCanvas, {
       type: 'line',
       data: {
-        labels,
+        labels: lineData.labels,
         datasets: [{
           label: yAxisLabel,
-          data: values,
+          data: lineData.values,
           borderColor: singleColor,
-          backgroundColor: hexAlpha(singleColor, 0.12),
-          borderWidth: 3,
+          backgroundColor: hexAlpha(singleColor, 0.10),
+          borderWidth: 2.5,
           pointBackgroundColor: singleColor,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 2.5,
-          pointRadius: 6,
-          pointHoverRadius: 9,
+          pointBorderWidth: 2,
+          pointRadius: lineData.labels.length > 20 ? 3 : 5,
+          pointHoverRadius: lineData.labels.length > 20 ? 6 : 8,
           fill: true,
-          tension: 0.42,
+          tension: 0.4,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'line', labels.length),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'line', lineData.labels.length),
     });
   }
 
-  // ── PIE CHART ──
+  // ── PIE CHART — selalu grup data kecil ──
   if (showPie) {
+    const MAX_PIE  = 12;  // maks slice sebelum digabung
+    const pieData  = groupSmallSlices(labels, values, MAX_PIE);
+    const pieColors = pieData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+
+    // Warna abu untuk slice "Lainnya" (selalu index terakhir jika ada)
+    if (pieData.grouped) {
+      pieColors[pieColors.length - 1] = '#94a3b8';
+    }
+
     chartInstances.pie = new Chart(document.getElementById('pieChart'), {
       type: 'pie',
       data: {
-        labels,
+        labels: pieData.labels,
         datasets: [{
           label: yAxisLabel,
-          data: values,
-          backgroundColor: colors.map((c) => hexAlpha(c, 0.85)),
-          borderColor: colors,
-          borderWidth: 1.5,
-          hoverOffset: 10,
+          data: pieData.values,
+          backgroundColor: pieColors.map((c) => hexAlpha(c, 0.88)),
+          borderColor: '#ffffff',
+          borderWidth: 2.5,
+          hoverOffset: 14,
         }],
       },
-      options: buildPieOptions(yAxisLabel),
+      options: buildPieOptions(yAxisLabel, pieData.grouped),
     });
   }
 }
@@ -575,28 +623,49 @@ function buildBarLineOptions(labelCol, valueCol, type, dataCount = 20) {
   };
 }
 
-function buildPieOptions(valueCol) {
+function buildPieOptions(valueCol, hasOther = false) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } },
     animation: {
       animateRotate: true,
       animateScale: true,
-      duration: 1200,
-      easing: 'easeOutElastic',
-      delay: (ctx) => ctx.dataIndex * 40,
+      duration: 1000,
+      easing: 'easeOutQuart',
+      delay: (ctx) => ctx.dataIndex * 35,
     },
     plugins: {
       legend: {
         position: 'right',
+        align: 'center',
         labels: {
-          boxWidth: 14,
-          boxHeight: 14,
-          padding: 16,
-          font: { size: 13 },
+          boxWidth: 13,
+          boxHeight: 13,
+          padding: 14,
+          font: { size: 12.5 },
           color: '#374151',
           usePointStyle: true,
           pointStyle: 'circle',
+          // Potong label terlalu panjang
+          generateLabels: (chart) => {
+            const data = chart.data;
+            return data.labels.map((label, i) => {
+              const ds    = data.datasets[0];
+              const total = ds.data.reduce((a, b) => a + b, 0);
+              const val   = ds.data[i];
+              const pct   = total ? ((val / total) * 100).toFixed(1) : '0';
+              const shortLabel = label.length > 22 ? label.slice(0, 20) + '…' : label;
+              return {
+                text: `${shortLabel}  ${pct}%`,
+                fillStyle: ds.backgroundColor[i],
+                strokeStyle: ds.borderColor,
+                lineWidth: 0,
+                hidden: false,
+                index: i,
+              };
+            });
+          },
         },
       },
       tooltip: {
