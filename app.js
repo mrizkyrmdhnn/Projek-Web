@@ -519,8 +519,8 @@ function renderCharts() {
 
   // ── LINE CHART ──
   if (showLine) {
-    // Line chart: maks 40 item sebelum digabung, tidak pakai minPct
-    const lineData = groupSmallSlices(labels, values, 40, 0);
+    // Line chart: maks 10 item, sisanya masuk "Lainnya"
+    const lineData = groupSmallSlices(labels, values, 10, 0);
 
     const lineCanvas = document.getElementById('lineChart');
     const lineW = Math.max(lineData.labels.length * 64, lineCanvas.parentElement.clientWidth - 1);
@@ -555,8 +555,7 @@ function renderCharts() {
 
   // ── PIE CHART — selalu grup data kecil ──
   if (showPie) {
-    const MAX_PIE  = 12;  // maks slice sebelum digabung
-    const pieData  = groupSmallSlices(labels, values, MAX_PIE);
+    const pieData   = groupSmallSlices(labels, values, 10);  // maks 10 slice
     const pieColors = pieData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
 
     // Warna abu untuk slice "Lainnya" (selalu index terakhir jika ada)
