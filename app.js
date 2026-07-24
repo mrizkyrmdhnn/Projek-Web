@@ -87,8 +87,9 @@ Chart.defaults.plugins.tooltip.titleFont       = { weight: '700', size: 14 };
 Chart.defaults.plugins.tooltip.bodyFont        = { size: 13 };
 Chart.defaults.plugins.tooltip.displayColors   = true;
 Chart.defaults.plugins.tooltip.boxPadding      = 5;
-Chart.defaults.animation.duration              = 1000;
-Chart.defaults.animation.easing               = 'easeOutBounce';
+// Animasi global TIDAK menggunakan easeOutBounce (menyebabkan bug flicker)
+Chart.defaults.animation.duration = 800;
+Chart.defaults.animation.easing   = 'easeOutCubic';
 
 // ─── FILE INPUT HANDLER ──────────────────────────────
 csvInput.addEventListener('change', (e) => {
@@ -351,17 +352,17 @@ function renderStats(valCol, overrideValues = null) {
   });
 }
 
-// ─── GROUP SMALL SLICES → "Lainnya" ─────────────────
+// ─── GROUP SMALL DATA → "Lainnya" ────────────────────────────────
 /**
- * Menggabungkan data dengan persentase kecil menjadi satu grup "Lainnya".
- * @param {string[]} labels  - array label asli
- * @param {number[]} values  - array nilai asli
- * @param {number}   maxItems - jumlah maksimal item yang tampil (sisanya digabung)
- * @returns {{ labels, values, grouped: boolean, groupedCount: number }}
+ * Menggabungkan data ke grup "Lainnya" berdasarkan DUA kondisi:
+ *  1. Jumlah item melebihi maxItems (item ke-11 dst masuk Other)
+ *  2. Persentase item < minPct% dari total (item kecil masuk Other)
+ *
+ * Data diurutkan besar-ke-kecil sebelum diproses.
  */
-function groupSmallSlices(labels, values, maxItems = 15) {
+function groupSmallSlices(labels, values, maxItems = 10, minPct = 20) {
   const total = values.reduce((a, b) => a + b, 0);
-  if (!total || labels.length <= maxItems) {
+  if (!total || labels.length === 0) {
     return { labels: [...labels], values: [...values], grouped: false, groupedCount: 0 };
   }
 
@@ -369,20 +370,39 @@ function groupSmallSlices(labels, values, maxItems = 15) {
   const indexed = labels.map((l, i) => ({ label: l, value: values[i] }));
   indexed.sort((a, b) => b.value - a.value);
 
-  const main   = indexed.slice(0, maxItems);
-  const others = indexed.slice(maxItems);
+  const main   = [];
+  const others = [];
+
+  indexed.forEach((item, idx) => {
+    const pct = (item.value / total) * 100;
+    // Masuk "other" jika: melebihi slot maxItems ATAU persentase < minPct
+    if (idx >= maxItems || pct < minPct) {
+      others.push(item);
+    } else {
+      main.push(item);
+    }
+  });
+
+  // Jika semua masuk other (misal semua < minPct), ambil yg terbesar tetap tampil
+  if (main.length === 0 && others.length > 0) {
+    main.push(others.shift());
+  }
 
   const otherTotal = others.reduce((a, b) => a + b.value, 0);
-
-  const newLabels = main.map((d) => d.label);
-  const newValues = main.map((d) => d.value);
+  const newLabels  = main.map((d) => d.label);
+  const newValues  = main.map((d) => d.value);
 
   if (others.length > 0) {
     newLabels.push(`Lainnya (${others.length} kategori)`);
     newValues.push(otherTotal);
   }
 
-  return { labels: newLabels, values: newValues, grouped: others.length > 0, groupedCount: others.length };
+  return {
+    labels: newLabels,
+    values: newValues,
+    grouped: others.length > 0,
+    groupedCount: others.length,
+  };
 }
 
 // ─── RENDER CHARTS ───────────────────────────────────
@@ -447,20 +467,25 @@ function renderCharts() {
 
   // ── BAR CHART ──
   if (showBar) {
-    // Untuk banyak data: grup kecil → "Lainnya", sisanya scroll
-    const MAX_BAR = 30;
-    const barData = groupSmallSlices(labels, values, MAX_BAR);
+    // Maks 10 bar tampil; item ke-11+ ATAU persentase < 20% masuk "Lainnya"
+    const barData = groupSmallSlices(labels, values, 10, 20);
     if (barData.grouped) {
-      showToast(`Bar: ${barData.groupedCount} kategori kecil digabung ke "Lainnya"`);
+      showToast(`${barData.groupedCount} kategori digabung ke “Lainnya”`);
     }
 
-    const barCanvas   = document.getElementById('barChart');
-    const barW        = Math.max(barData.labels.length * 56, barCanvas.parentElement.clientWidth - 1);
+    const barCanvas = document.getElementById('barChart');
+    // Lebar tiap bar: proporsional, min agar tidak terlalu sempit
+    const barPerItem = Math.max(80, Math.floor((barCanvas.parentElement.clientWidth - 80) / barData.labels.length));
+    const barW = Math.max(barData.labels.length * barPerItem, barCanvas.parentElement.clientWidth - 1);
     barCanvas.style.width  = barW + 'px';
     barCanvas.style.height = '100%';
 
-    const barBg     = barData.labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.82));
-    const barBorder = barData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+    // Warna abu untuk "Lainnya" (index terakhir jika ada)
+    const barColors = barData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+    if (barData.grouped) barColors[barColors.length - 1] = '#94a3b8';
+
+    const barBg     = barColors.map((c) => hexAlpha(c, 0.80));
+    const barBorder = barColors;
 
     chartInstances.bar = new Chart(barCanvas, {
       type: 'bar',
@@ -472,23 +497,23 @@ function renderCharts() {
           backgroundColor: barBg,
           borderColor: barBorder,
           borderWidth: 2,
-          borderRadius: 8,
+          borderRadius: 10,
           borderSkipped: false,
-          borderRadiusTopLeft: 8,
-          borderRadiusTopRight: 8,
+          hoverBackgroundColor: barColors.map((c) => hexAlpha(c, 1.0)),
+          hoverBorderWidth: 3,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar', barData.labels.length),
+      options: buildBarOptions(labelCol, yAxisLabel, barData.labels.length),
     });
   }
 
   // ── LINE CHART ──
   if (showLine) {
-    const MAX_LINE = 40;
-    const lineData = groupSmallSlices(labels, values, MAX_LINE);
+    // Line chart: maks 40 item sebelum digabung, tidak pakai minPct
+    const lineData = groupSmallSlices(labels, values, 40, 0);
 
-    const lineCanvas  = document.getElementById('lineChart');
-    const lineW       = Math.max(lineData.labels.length * 56, lineCanvas.parentElement.clientWidth - 1);
+    const lineCanvas = document.getElementById('lineChart');
+    const lineW = Math.max(lineData.labels.length * 64, lineCanvas.parentElement.clientWidth - 1);
     lineCanvas.style.width  = lineW + 'px';
     lineCanvas.style.height = '100%';
 
@@ -506,12 +531,15 @@ function renderCharts() {
           pointBorderColor: '#ffffff',
           pointBorderWidth: 2,
           pointRadius: lineData.labels.length > 20 ? 3 : 5,
-          pointHoverRadius: lineData.labels.length > 20 ? 6 : 8,
+          pointHoverRadius: lineData.labels.length > 20 ? 7 : 9,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderColor: singleColor,
+          pointHoverBorderWidth: 3,
           fill: true,
           tension: 0.4,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'line', lineData.labels.length),
+      options: buildLineOptions(labelCol, yAxisLabel, lineData.labels.length),
     });
   }
 
@@ -544,68 +572,126 @@ function renderCharts() {
   }
 }
 
-// ─── CHART OPTIONS BUILDERS ──────────────────────────
-function buildBarLineOptions(labelCol, valueCol, type, dataCount = 20) {
-  // Sesuaikan ukuran bar/tick berdasarkan jumlah data
-  const manyData = dataCount > 30;
+// ─── BAR CHART OPTIONS ─────────────────────────────────
+function buildBarOptions(labelCol, valueCol, dataCount = 10) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    // Animasi masuk sekali, tidak ada delay per-item (mencegah bug flicker)
     animation: {
-      duration: 900,
+      duration: 700,
       easing: 'easeOutQuart',
-      delay: (ctx) => ctx.dataIndex * 30, // staggered per bar
+    },
+    transitions: {
+      active: { animation: { duration: 200 } },
     },
     interaction: {
       mode: 'index',
       intersect: false,
     },
     plugins: {
-      legend: {
-        display: false,
-      },
+      legend: { display: false },
       tooltip: {
         callbacks: {
           title: (items) => items[0].label,
-          label: (item) => {
-            const val = item.raw;
-            return ` ${valueCol}: ${formatNumber(val)}`;
-          },
+          label: (item) => ` ${valueCol}: ${formatNumber(item.raw)}`,
         },
       },
     },
     scales: {
       x: {
-        grid: {
-          display: false,
-        },
-        border: {
-          display: false,
-        },
+        grid: { display: false },
+        border: { display: false },
         ticks: {
-          maxRotation: manyData ? 60 : 45,
-          minRotation: manyData ? 45 : 0,
-          font: { size: manyData ? 10 : 12 },
+          maxRotation: 0,
+          minRotation: 0,
+          font: { size: 12, weight: '500' },
           color: '#6b7280',
-          autoSkip: false,  // tampilkan semua label
+          autoSkip: false,
         },
         title: {
           display: !!labelCol,
           text: labelCol,
           color: '#9ca3af',
           font: { size: 12, weight: '600' },
-          padding: { top: 8 },
+          padding: { top: 10 },
         },
       },
       y: {
+        beginAtZero: true,
         grid: {
-          color: 'rgba(243,244,246,0.9)',
+          color: 'rgba(229,231,235,0.7)',
           lineWidth: 1,
         },
-        border: {
-          display: false,
-          dash: [4, 4],
+        border: { display: false, dash: [4, 4] },
+        ticks: {
+          color: '#6b7280',
+          font: { size: 12 },
+          callback: (val) => formatNumber(val),
         },
+        title: {
+          display: !!valueCol,
+          text: valueCol,
+          color: '#9ca3af',
+          font: { size: 12, weight: '600' },
+          padding: { bottom: 8 },
+        },
+      },
+    },
+  };
+}
+
+// ─── LINE CHART OPTIONS ───────────────────────────────
+function buildLineOptions(labelCol, valueCol, dataCount = 20) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 900,
+      easing: 'easeInOutQuart',
+    },
+    transitions: {
+      active: { animation: { duration: 150 } },
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => items[0].label,
+          label: (item) => ` ${valueCol}: ${formatNumber(item.raw)}`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: {
+          maxRotation: dataCount > 20 ? 45 : 0,
+          font: { size: dataCount > 20 ? 10 : 12 },
+          color: '#6b7280',
+          autoSkip: dataCount > 30,
+          maxTicksLimit: dataCount > 30 ? 20 : undefined,
+        },
+        title: {
+          display: !!labelCol,
+          text: labelCol,
+          color: '#9ca3af',
+          font: { size: 12, weight: '600' },
+          padding: { top: 10 },
+        },
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(229,231,235,0.7)',
+          lineWidth: 1,
+        },
+        border: { display: false, dash: [4, 4] },
         ticks: {
           color: '#6b7280',
           font: { size: 12 },
