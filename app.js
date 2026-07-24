@@ -425,8 +425,18 @@ function renderCharts() {
   let labels, values, yAxisLabel;
 
   if (isNumeric) {
-    labels     = parsedData.map((r) => String(r[labelCol] ?? ''));
-    values     = numParsed;
+    // Gabungkan label yang sama: jumlahkan nilainya (mencegah duplikasi bar)
+    const agg = {};
+    parsedData.forEach((r, i) => {
+      const key = String(r[labelCol] ?? '(kosong)').trim();
+      const val = numParsed[i];
+      if (isNaN(val)) return;
+      agg[key] = (agg[key] || 0) + val;
+    });
+    // Urutkan dari nilai terbesar ke terkecil
+    const sortedAgg = Object.entries(agg).sort((a, b) => b[1] - a[1]);
+    labels     = sortedAgg.map(([k]) => k);
+    values     = sortedAgg.map(([, v]) => v);
     yAxisLabel = valueCol;
   } else {
     const freq = {};
