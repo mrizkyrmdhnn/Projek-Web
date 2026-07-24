@@ -76,19 +76,19 @@ document.getElementById('btnDlPie').addEventListener('click', () => downloadChar
 
 // ─── CHART.JS GLOBAL DEFAULTS ────────────────────────
 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
-Chart.defaults.font.size   = 12;
+Chart.defaults.font.size   = 13;
 Chart.defaults.color       = '#374151';
-Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(17,24,39,0.92)';
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.95)';
 Chart.defaults.plugins.tooltip.titleColor      = '#f9fafb';
-Chart.defaults.plugins.tooltip.bodyColor       = '#e5e7eb';
-Chart.defaults.plugins.tooltip.padding         = { x: 12, y: 10 };
-Chart.defaults.plugins.tooltip.cornerRadius    = 8;
-Chart.defaults.plugins.tooltip.titleFont       = { weight: '600', size: 13 };
-Chart.defaults.plugins.tooltip.bodyFont        = { size: 12 };
+Chart.defaults.plugins.tooltip.bodyColor       = '#cbd5e1';
+Chart.defaults.plugins.tooltip.padding         = { x: 14, y: 12 };
+Chart.defaults.plugins.tooltip.cornerRadius    = 10;
+Chart.defaults.plugins.tooltip.titleFont       = { weight: '700', size: 14 };
+Chart.defaults.plugins.tooltip.bodyFont        = { size: 13 };
 Chart.defaults.plugins.tooltip.displayColors   = true;
-Chart.defaults.plugins.tooltip.boxPadding      = 4;
-Chart.defaults.animation.duration              = 700;
-Chart.defaults.animation.easing               = 'easeOutQuart';
+Chart.defaults.plugins.tooltip.boxPadding      = 5;
+Chart.defaults.animation.duration              = 1000;
+Chart.defaults.animation.easing               = 'easeOutBounce';
 
 // ─── FILE INPUT HANDLER ──────────────────────────────
 csvInput.addEventListener('change', (e) => {
@@ -397,18 +397,14 @@ function renderCharts() {
   const showLine = chartType === 'all' || chartType === 'line';
   const showPie  = chartType === 'all' || chartType === 'pie';
 
-  // Row bar+line visibility
+  // Semua chart tampil satu per baris (full width, stacked vertical)
   rowBarLine.style.display = (showBar || showLine) ? '' : 'none';
   wrapBar.style.display    = showBar  ? '' : 'none';
   wrapLine.style.display   = showLine ? '' : 'none';
   rowPie.style.display     = showPie  ? '' : 'none';
 
-  // Adjust grid if only one of bar/line is shown
-  if (showBar && showLine) {
-    rowBarLine.style.gridTemplateColumns = '1fr 1fr';
-  } else {
-    rowBarLine.style.gridTemplateColumns = '1fr';
-  }
+  // Setiap chart mengambil lebar penuh (tidak ada grid 2 kolom)
+  rowBarLine.style.gridTemplateColumns = '';
 
   // Animate chart cards
   [wrapBar, wrapLine, wrapPie].forEach((el) => {
@@ -422,10 +418,16 @@ function renderCharts() {
 
   // ── BAR CHART ──
   if (showBar) {
-    const barBg = labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.85));
+    // Untuk banyak data: set min lebar canvas agar scrollable
+    const barCanvas = document.getElementById('barChart');
+    const minBarWidth = Math.max(labels.length * 52, barCanvas.parentElement.clientWidth);
+    barCanvas.style.width  = minBarWidth + 'px';
+    barCanvas.style.height = '100%';
+
+    const barBg     = labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.85));
     const barBorder = labels.map((_, i) => PALETTE[i % PALETTE.length]);
 
-    chartInstances.bar = new Chart(document.getElementById('barChart'), {
+    chartInstances.bar = new Chart(barCanvas, {
       type: 'bar',
       data: {
         labels,
@@ -434,18 +436,24 @@ function renderCharts() {
           data: values,
           backgroundColor: barBg,
           borderColor: barBorder,
-          borderWidth: 1.5,
-          borderRadius: 6,
+          borderWidth: 2,
+          borderRadius: 8,
           borderSkipped: false,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar', labels.length),
     });
   }
 
   // ── LINE CHART ──
   if (showLine) {
-    chartInstances.line = new Chart(document.getElementById('lineChart'), {
+    // Untuk banyak data: set min lebar canvas agar scrollable
+    const lineCanvas = document.getElementById('lineChart');
+    const minLineWidth = Math.max(labels.length * 52, lineCanvas.parentElement.clientWidth);
+    lineCanvas.style.width  = minLineWidth + 'px';
+    lineCanvas.style.height = '100%';
+
+    chartInstances.line = new Chart(lineCanvas, {
       type: 'line',
       data: {
         labels,
@@ -453,18 +461,18 @@ function renderCharts() {
           label: yAxisLabel,
           data: values,
           borderColor: singleColor,
-          backgroundColor: hexAlpha(singleColor, 0.1),
-          borderWidth: 2.5,
+          backgroundColor: hexAlpha(singleColor, 0.12),
+          borderWidth: 3,
           pointBackgroundColor: singleColor,
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7,
+          pointBorderWidth: 2.5,
+          pointRadius: 6,
+          pointHoverRadius: 9,
           fill: true,
-          tension: 0.38,
+          tension: 0.42,
         }],
       },
-      options: buildBarLineOptions(labelCol, yAxisLabel, 'line'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'line', labels.length),
     });
   }
 
@@ -489,13 +497,16 @@ function renderCharts() {
 }
 
 // ─── CHART OPTIONS BUILDERS ──────────────────────────
-function buildBarLineOptions(labelCol, valueCol, type) {
+function buildBarLineOptions(labelCol, valueCol, type, dataCount = 20) {
+  // Sesuaikan ukuran bar/tick berdasarkan jumlah data
+  const manyData = dataCount > 30;
   return {
     responsive: true,
     maintainAspectRatio: false,
     animation: {
-      duration: 750,
+      duration: 900,
       easing: 'easeOutQuart',
+      delay: (ctx) => ctx.dataIndex * 30, // staggered per bar
     },
     interaction: {
       mode: 'index',
@@ -524,21 +535,23 @@ function buildBarLineOptions(labelCol, valueCol, type) {
           display: false,
         },
         ticks: {
-          maxRotation: 45,
-          font: { size: 11 },
+          maxRotation: manyData ? 60 : 45,
+          minRotation: manyData ? 45 : 0,
+          font: { size: manyData ? 10 : 12 },
           color: '#6b7280',
-          maxTicksLimit: 20,
+          autoSkip: false,  // tampilkan semua label
         },
         title: {
           display: !!labelCol,
           text: labelCol,
           color: '#9ca3af',
-          font: { size: 11, weight: '500' },
+          font: { size: 12, weight: '600' },
+          padding: { top: 8 },
         },
       },
       y: {
         grid: {
-          color: '#f3f4f6',
+          color: 'rgba(243,244,246,0.9)',
           lineWidth: 1,
         },
         border: {
@@ -547,14 +560,15 @@ function buildBarLineOptions(labelCol, valueCol, type) {
         },
         ticks: {
           color: '#6b7280',
-          font: { size: 11 },
+          font: { size: 12 },
           callback: (val) => formatNumber(val),
         },
         title: {
           display: !!valueCol,
           text: valueCol,
           color: '#9ca3af',
-          font: { size: 11, weight: '500' },
+          font: { size: 12, weight: '600' },
+          padding: { bottom: 8 },
         },
       },
     },
@@ -568,17 +582,18 @@ function buildPieOptions(valueCol) {
     animation: {
       animateRotate: true,
       animateScale: true,
-      duration: 800,
-      easing: 'easeOutQuart',
+      duration: 1200,
+      easing: 'easeOutElastic',
+      delay: (ctx) => ctx.dataIndex * 40,
     },
     plugins: {
       legend: {
         position: 'right',
         labels: {
-          boxWidth: 12,
-          boxHeight: 12,
-          padding: 14,
-          font: { size: 12 },
+          boxWidth: 14,
+          boxHeight: 14,
+          padding: 16,
+          font: { size: 13 },
           color: '#374151',
           usePointStyle: true,
           pointStyle: 'circle',
