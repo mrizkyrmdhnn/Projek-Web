@@ -76,19 +76,19 @@ document.getElementById('btnDlPie').addEventListener('click', () => downloadChar
 
 // ─── CHART.JS GLOBAL DEFAULTS ────────────────────────
 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
-Chart.defaults.font.size   = 12;
+Chart.defaults.font.size   = 13;
 Chart.defaults.color       = '#374151';
-Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(17,24,39,0.92)';
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.95)';
 Chart.defaults.plugins.tooltip.titleColor      = '#f9fafb';
-Chart.defaults.plugins.tooltip.bodyColor       = '#e5e7eb';
-Chart.defaults.plugins.tooltip.padding         = { x: 12, y: 10 };
-Chart.defaults.plugins.tooltip.cornerRadius    = 8;
-Chart.defaults.plugins.tooltip.titleFont       = { weight: '600', size: 13 };
-Chart.defaults.plugins.tooltip.bodyFont        = { size: 12 };
+Chart.defaults.plugins.tooltip.bodyColor       = '#cbd5e1';
+Chart.defaults.plugins.tooltip.padding         = { x: 14, y: 12 };
+Chart.defaults.plugins.tooltip.cornerRadius    = 10;
+Chart.defaults.plugins.tooltip.titleFont       = { weight: '700', size: 14 };
+Chart.defaults.plugins.tooltip.bodyFont        = { size: 13 };
 Chart.defaults.plugins.tooltip.displayColors   = true;
-Chart.defaults.plugins.tooltip.boxPadding      = 4;
-Chart.defaults.animation.duration              = 700;
-Chart.defaults.animation.easing               = 'easeOutQuart';
+Chart.defaults.plugins.tooltip.boxPadding      = 5;
+Chart.defaults.animation.duration              = 1000;
+Chart.defaults.animation.easing               = 'easeOutBounce';
 
 // ─── FILE INPUT HANDLER ──────────────────────────────
 csvInput.addEventListener('change', (e) => {
@@ -119,6 +119,11 @@ dropZone.addEventListener('drop', (e) => {
 
 // ─── BUTTONS ─────────────────────────────────────────
 btnRender.addEventListener('click', renderCharts);
+
+// Auto-render saat dropdown berubah
+labelColSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
+valueColSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
+chartTypeSel.addEventListener('change', () => { if (parsedData.length) renderCharts(); });
 
 btnReset.addEventListener('click', () => {
   parsedData = [];
@@ -315,10 +320,10 @@ function buildTable() {
 }
 
 // ─── RENDER STATS ────────────────────────────────────
-function renderStats(valCol) {
-  const values = parsedData
-    .map((r) => parseFloat(r[valCol]))
-    .filter((v) => !isNaN(v));
+function renderStats(valCol, overrideValues = null) {
+  const values = overrideValues
+    ? overrideValues.filter((v) => !isNaN(v))
+    : parsedData.map((r) => parseFloat(r[valCol])).filter((v) => !isNaN(v));
 
   statRows.textContent = parsedData.length.toLocaleString('id-ID');
   statCols.textContent = columns.length;
@@ -346,6 +351,40 @@ function renderStats(valCol) {
   });
 }
 
+// ─── GROUP SMALL SLICES → "Lainnya" ─────────────────
+/**
+ * Menggabungkan data dengan persentase kecil menjadi satu grup "Lainnya".
+ * @param {string[]} labels  - array label asli
+ * @param {number[]} values  - array nilai asli
+ * @param {number}   maxItems - jumlah maksimal item yang tampil (sisanya digabung)
+ * @returns {{ labels, values, grouped: boolean, groupedCount: number }}
+ */
+function groupSmallSlices(labels, values, maxItems = 15) {
+  const total = values.reduce((a, b) => a + b, 0);
+  if (!total || labels.length <= maxItems) {
+    return { labels: [...labels], values: [...values], grouped: false, groupedCount: 0 };
+  }
+
+  // Urutkan dari besar ke kecil
+  const indexed = labels.map((l, i) => ({ label: l, value: values[i] }));
+  indexed.sort((a, b) => b.value - a.value);
+
+  const main   = indexed.slice(0, maxItems);
+  const others = indexed.slice(maxItems);
+
+  const otherTotal = others.reduce((a, b) => a + b.value, 0);
+
+  const newLabels = main.map((d) => d.label);
+  const newValues = main.map((d) => d.value);
+
+  if (others.length > 0) {
+    newLabels.push(`Lainnya (${others.length} kategori)`);
+    newValues.push(otherTotal);
+  }
+
+  return { labels: newLabels, values: newValues, grouped: others.length > 0, groupedCount: others.length };
+}
+
 // ─── RENDER CHARTS ───────────────────────────────────
 function renderCharts() {
   const labelCol  = labelColSel.value;
@@ -357,36 +396,45 @@ function renderCharts() {
     return;
   }
 
-  // Extract labels & values
-  const labels = parsedData.map((r) => r[labelCol] ?? '');
-  const values = parsedData.map((r) => parseFloat(r[valueCol]));
+  // ── Deteksi apakah kolom nilai numerik ──
+  const rawValues    = parsedData.map((r) => r[valueCol]);
+  const numParsed    = rawValues.map((v) => parseFloat(v));
+  const numericCount = numParsed.filter((v) => !isNaN(v)).length;
+  const isNumeric    = numericCount / rawValues.length >= 0.5;
 
-  if (values.every(isNaN)) {
-    showToast('Kolom nilai tidak mengandung data numerik');
-    return;
+  let labels, values, yAxisLabel;
+
+  if (isNumeric) {
+    labels     = parsedData.map((r) => String(r[labelCol] ?? ''));
+    values     = numParsed;
+    yAxisLabel = valueCol;
+  } else {
+    const freq = {};
+    parsedData.forEach((r) => {
+      const key = String(r[labelCol] ?? '(kosong)');
+      freq[key] = (freq[key] || 0) + 1;
+    });
+    // Urutkan dari besar ke kecil
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    labels     = sorted.map(([k]) => k);
+    values     = sorted.map(([, v]) => v);
+    yAxisLabel = 'Jumlah';
+    showToast(`Mode frekuensi: menghitung kemunculan "${labelCol}"`);
   }
 
-  renderStats(valueCol);
+  renderStats(valueCol, isNumeric ? null : values);
   destroyAllCharts();
   show(chartsArea);
 
-  // Determine which charts to show
   const showBar  = chartType === 'all' || chartType === 'bar';
   const showLine = chartType === 'all' || chartType === 'line';
   const showPie  = chartType === 'all' || chartType === 'pie';
 
-  // Row bar+line visibility
   rowBarLine.style.display = (showBar || showLine) ? '' : 'none';
   wrapBar.style.display    = showBar  ? '' : 'none';
   wrapLine.style.display   = showLine ? '' : 'none';
   rowPie.style.display     = showPie  ? '' : 'none';
-
-  // Adjust grid if only one of bar/line is shown
-  if (showBar && showLine) {
-    rowBarLine.style.gridTemplateColumns = '1fr 1fr';
-  } else {
-    rowBarLine.style.gridTemplateColumns = '1fr';
-  }
+  rowBarLine.style.gridTemplateColumns = '';
 
   // Animate chart cards
   [wrapBar, wrapLine, wrapPie].forEach((el) => {
@@ -395,85 +443,118 @@ function renderCharts() {
     el.classList.add('animate-in');
   });
 
-  const colors      = PALETTE.slice(0, labels.length);
   const singleColor = PALETTE[0];
 
   // ── BAR CHART ──
   if (showBar) {
-    const barBg = labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.85));
-    const barBorder = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+    // Untuk banyak data: grup kecil → "Lainnya", sisanya scroll
+    const MAX_BAR = 30;
+    const barData = groupSmallSlices(labels, values, MAX_BAR);
+    if (barData.grouped) {
+      showToast(`Bar: ${barData.groupedCount} kategori kecil digabung ke "Lainnya"`);
+    }
 
-    chartInstances.bar = new Chart(document.getElementById('barChart'), {
+    const barCanvas   = document.getElementById('barChart');
+    const barW        = Math.max(barData.labels.length * 56, barCanvas.parentElement.clientWidth - 1);
+    barCanvas.style.width  = barW + 'px';
+    barCanvas.style.height = '100%';
+
+    const barBg     = barData.labels.map((_, i) => hexAlpha(PALETTE[i % PALETTE.length], 0.82));
+    const barBorder = barData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+
+    chartInstances.bar = new Chart(barCanvas, {
       type: 'bar',
       data: {
-        labels,
+        labels: barData.labels,
         datasets: [{
-          label: valueCol,
-          data: values,
+          label: yAxisLabel,
+          data: barData.values,
           backgroundColor: barBg,
           borderColor: barBorder,
-          borderWidth: 1.5,
-          borderRadius: 6,
+          borderWidth: 2,
+          borderRadius: 8,
           borderSkipped: false,
+          borderRadiusTopLeft: 8,
+          borderRadiusTopRight: 8,
         }],
       },
-      options: buildBarLineOptions(labelCol, valueCol, 'bar'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'bar', barData.labels.length),
     });
   }
 
   // ── LINE CHART ──
   if (showLine) {
-    chartInstances.line = new Chart(document.getElementById('lineChart'), {
+    const MAX_LINE = 40;
+    const lineData = groupSmallSlices(labels, values, MAX_LINE);
+
+    const lineCanvas  = document.getElementById('lineChart');
+    const lineW       = Math.max(lineData.labels.length * 56, lineCanvas.parentElement.clientWidth - 1);
+    lineCanvas.style.width  = lineW + 'px';
+    lineCanvas.style.height = '100%';
+
+    chartInstances.line = new Chart(lineCanvas, {
       type: 'line',
       data: {
-        labels,
+        labels: lineData.labels,
         datasets: [{
-          label: valueCol,
-          data: values,
+          label: yAxisLabel,
+          data: lineData.values,
           borderColor: singleColor,
-          backgroundColor: hexAlpha(singleColor, 0.1),
+          backgroundColor: hexAlpha(singleColor, 0.10),
           borderWidth: 2.5,
           pointBackgroundColor: singleColor,
           pointBorderColor: '#ffffff',
           pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7,
+          pointRadius: lineData.labels.length > 20 ? 3 : 5,
+          pointHoverRadius: lineData.labels.length > 20 ? 6 : 8,
           fill: true,
-          tension: 0.38,
+          tension: 0.4,
         }],
       },
-      options: buildBarLineOptions(labelCol, valueCol, 'line'),
+      options: buildBarLineOptions(labelCol, yAxisLabel, 'line', lineData.labels.length),
     });
   }
 
-  // ── PIE CHART ──
+  // ── PIE CHART — selalu grup data kecil ──
   if (showPie) {
+    const MAX_PIE  = 12;  // maks slice sebelum digabung
+    const pieData  = groupSmallSlices(labels, values, MAX_PIE);
+    const pieColors = pieData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+
+    // Warna abu untuk slice "Lainnya" (selalu index terakhir jika ada)
+    if (pieData.grouped) {
+      pieColors[pieColors.length - 1] = '#94a3b8';
+    }
+
     chartInstances.pie = new Chart(document.getElementById('pieChart'), {
       type: 'pie',
       data: {
-        labels,
+        labels: pieData.labels,
         datasets: [{
-          label: valueCol,
-          data: values,
-          backgroundColor: colors.map((c) => hexAlpha(c, 0.85)),
-          borderColor: colors,
-          borderWidth: 1.5,
-          hoverOffset: 10,
+          label: yAxisLabel,
+          data: pieData.values,
+          backgroundColor: pieColors.map((c) => hexAlpha(c, 0.88)),
+          borderColor: '#ffffff',
+          borderWidth: 2.5,
+          hoverOffset: 14,
         }],
       },
-      options: buildPieOptions(valueCol),
+      options: buildPieOptions(yAxisLabel, pieData.grouped),
     });
   }
 }
 
 // ─── CHART OPTIONS BUILDERS ──────────────────────────
-function buildBarLineOptions(labelCol, valueCol, type) {
+function buildBarLineOptions(labelCol, valueCol, type, dataCount = 20) {
+  // Sesuaikan ukuran bar/tick berdasarkan jumlah data
+  const manyData = dataCount > 30;
   return {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     animation: {
-      duration: 750,
+      duration: 900,
       easing: 'easeOutQuart',
+      delay: (ctx) => ctx.dataIndex * 30, // staggered per bar
     },
     interaction: {
       mode: 'index',
@@ -502,21 +583,23 @@ function buildBarLineOptions(labelCol, valueCol, type) {
           display: false,
         },
         ticks: {
-          maxRotation: 45,
-          font: { size: 11 },
+          maxRotation: manyData ? 60 : 45,
+          minRotation: manyData ? 45 : 0,
+          font: { size: manyData ? 10 : 12 },
           color: '#6b7280',
-          maxTicksLimit: 20,
+          autoSkip: false,  // tampilkan semua label
         },
         title: {
           display: !!labelCol,
           text: labelCol,
           color: '#9ca3af',
-          font: { size: 11, weight: '500' },
+          font: { size: 12, weight: '600' },
+          padding: { top: 8 },
         },
       },
       y: {
         grid: {
-          color: '#f3f4f6',
+          color: 'rgba(243,244,246,0.9)',
           lineWidth: 1,
         },
         border: {
@@ -525,41 +608,64 @@ function buildBarLineOptions(labelCol, valueCol, type) {
         },
         ticks: {
           color: '#6b7280',
-          font: { size: 11 },
+          font: { size: 12 },
           callback: (val) => formatNumber(val),
         },
         title: {
           display: !!valueCol,
           text: valueCol,
           color: '#9ca3af',
-          font: { size: 11, weight: '500' },
+          font: { size: 12, weight: '600' },
+          padding: { bottom: 8 },
         },
       },
     },
   };
 }
 
-function buildPieOptions(valueCol) {
+function buildPieOptions(valueCol, hasOther = false) {
   return {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } },
     animation: {
       animateRotate: true,
       animateScale: true,
-      duration: 800,
+      duration: 1000,
       easing: 'easeOutQuart',
+      delay: (ctx) => ctx.dataIndex * 35,
     },
     plugins: {
       legend: {
         position: 'right',
+        align: 'center',
         labels: {
-          boxWidth: 12,
-          boxHeight: 12,
+          boxWidth: 13,
+          boxHeight: 13,
           padding: 14,
-          font: { size: 12 },
+          font: { size: 12.5 },
           color: '#374151',
           usePointStyle: true,
           pointStyle: 'circle',
+          // Potong label terlalu panjang
+          generateLabels: (chart) => {
+            const data = chart.data;
+            return data.labels.map((label, i) => {
+              const ds    = data.datasets[0];
+              const total = ds.data.reduce((a, b) => a + b, 0);
+              const val   = ds.data[i];
+              const pct   = total ? ((val / total) * 100).toFixed(1) : '0';
+              const shortLabel = label.length > 22 ? label.slice(0, 20) + '…' : label;
+              return {
+                text: `${shortLabel}  ${pct}%`,
+                fillStyle: ds.backgroundColor[i],
+                strokeStyle: ds.borderColor,
+                lineWidth: 0,
+                hidden: false,
+                index: i,
+              };
+            });
+          },
         },
       },
       tooltip: {
