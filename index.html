@@ -4,212 +4,518 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSV Data Visualizer</title>
+  <title>NetInventory — Dashboard Inventaris Jaringan</title>
   <meta name="description"
-    content="Visualisasi data CSV secara interaktif menggunakan Bar Chart, Line Chart, dan Pie Chart berbasis Chart.js." />
+    content="Dashboard inventaris jaringan interaktif: unggah data CSV/XLSX dan visualisasikan perangkat, status, lokasi, dan metrik jaringan secara real-time." />
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
 
-  <!-- HEADER -->
-  <header class="header">
+  <!-- ═══════════════════════════════════════════════════════ HEADER -->
+  <header class="header" id="appHeader">
     <div class="container">
       <div class="header-inner">
         <div class="brand">
-          <div>
-            <h1 class="brand-title">Pengvisualisasi Datamu</h1>
+          <div class="brand-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+              <rect x="2" y="2" width="8" height="8" rx="2"/>
+              <rect x="14" y="2" width="8" height="8" rx="2"/>
+              <rect x="2" y="14" width="8" height="8" rx="2"/>
+              <rect x="14" y="14" width="8" height="8" rx="2"/>
+              <line x1="10" y1="6" x2="14" y2="6"/>
+              <line x1="6" y1="10" x2="6" y2="14"/>
+              <line x1="18" y1="10" x2="18" y2="14"/>
+              <line x1="10" y1="18" x2="14" y2="18"/>
+            </svg>
           </div>
+          <div>
+            <h1 class="brand-title">NetInventory</h1>
+            <p class="brand-sub">Dashboard Inventaris Jaringan</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <div class="header-status-wrap" id="headerStatusWrap">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="header-status" id="headerStatus">Belum ada data dimuat</span>
+          </div>
+          <button class="btn-header-reset hidden" id="btnHeaderReset" title="Reset semua data">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+            </svg>
+            Reset
+          </button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- UPLOAD SECTION -->
+  <!-- ═══════════════════════════════════════════════════════ MAIN -->
   <main class="main">
     <div class="container">
 
+      <!-- ── UPLOAD HERO ── -->
       <section class="upload-section" id="uploadSection">
-        <div class="upload-card" id="dropZone">
-          <div class="upload-icon-wrap">
-            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-          </div>
-          <h2 class="upload-title">Unggah File</h2>
-          <p class="upload-desc">Seret dan lepas file ke sini, atau klik tombol di bawah</p>
-          <p class="upload-hint">Format yang didukung .csv dan .xlsx</p>
-          <label class="btn-upload" for="csvInput">Unggah File</label>
-          <input type="file" id="csvInput"
-            accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
-        </div>
-      </section>
-
-      <!-- COLUMN SELECTOR -->
-      <section class="control-section hidden" id="controlSection">
-        <div class="control-card">
-          <h3 class="control-title">Konfigurasi Data</h3>
-          <div class="control-grid">
-            <div class="control-field">
-              <label class="field-label" for="labelCol">Kolom Label (Sumbu X / Kategori)</label>
-              <select class="field-select" id="labelCol"></select>
+        <div class="upload-hero">
+          <div class="upload-hero-left">
+            <div class="upload-badge">
+              <span class="upload-badge-dot"></span>
+              Siap Menerima Data
             </div>
-            <div class="control-field">
-              <label class="field-label" for="valueCol">Kolom Nilai (Sumbu Y / Data)</label>
-              <select class="field-select" id="valueCol"></select>
+            <h2 class="upload-hero-title">Unggah Data Inventaris<br>Jaringan Anda</h2>
+            <p class="upload-hero-desc">
+              Visualisasikan perangkat, status, lokasi, dan metrik jaringan secara otomatis
+              dari file CSV atau XLSX Anda.
+            </p>
+            <div class="upload-supported">
+              <span class="fmt-chip">
+                <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M4 2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 1a1 1 0 00-1 1v8a1 1 0 001 1h8a1 1 0 001-1V4a1 1 0 00-1-1H4z"/></svg>
+                .CSV
+              </span>
+              <span class="fmt-chip">
+                <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10"><path d="M4 2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 1a1 1 0 00-1 1v8a1 1 0 001 1h8a1 1 0 001-1V4a1 1 0 00-1-1H4z"/></svg>
+                .XLSX
+              </span>
             </div>
-            <div class="control-field">
-              <label class="field-label" for="chartType">Tipe Grafik</label>
-              <select class="field-select" id="chartType">
-                <option value="all">Tampilkan Semua Grafik</option>
-                <option value="bar">Bar Chart saja</option>
-                <option value="line">Line Chart saja</option>
-                <option value="pie">Pie Chart saja</option>
-              </select>
-            </div>
-            <div class="control-actions">
-              <button class="btn-primary" id="btnRender">Buat Grafik</button>
-              <button class="btn-secondary" id="btnReset">Reset</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- STATS SUMMARY -->
-      <section class="stats-section hidden" id="statsSection">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Total Baris</div>
-            <div class="stat-value" id="statRows">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total Kolom</div>
-            <div class="stat-value" id="statCols">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Nilai Tertinggi</div>
-            <div class="stat-value" id="statMax">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Nilai Terendah</div>
-            <div class="stat-value" id="statMin">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Rata-rata</div>
-            <div class="stat-value" id="statAvg">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total</div>
-            <div class="stat-value" id="statSum">-</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- CHARTS AREA -->
-      <section class="charts-area hidden" id="chartsArea">
-
-        <div class="chart-row" id="rowBarLine">
-          <!-- BAR CHART -->
-          <div class="chart-card" id="wrapBar">
-            <div class="chart-card-header">
-              <div>
-                <h3 class="chart-card-title">Bar Chart</h3>
-                <p class="chart-card-desc">Perbandingan nilai antar kategori</p>
-              </div>
-              <button class="btn-download" id="btnDlBar" title="Unduh gambar">
+            <div class="upload-actions">
+              <label class="btn-primary btn-lg" for="csvInput" id="btnUploadLabel">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                  <path fill-rule="evenodd"
-                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+                  <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                 </svg>
-                Unduh
+                Unggah File
+              </label>
+              <input type="file" id="csvInput"
+                accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+              <div class="or-divider">atau seret file ke area ini</div>
+            </div>
+          </div>
+          <div class="upload-hero-right" id="dropZone">
+            <div class="drop-area-inner">
+              <div class="drop-icon-wrap">
+                <svg class="drop-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="8" y="8" width="22" height="22" rx="4" stroke-dasharray="4 2"/>
+                  <rect x="34" y="8" width="22" height="22" rx="4" stroke-dasharray="4 2"/>
+                  <rect x="8" y="34" width="22" height="22" rx="4" stroke-dasharray="4 2"/>
+                  <rect x="34" y="34" width="22" height="22" rx="4" stroke-dasharray="4 2"/>
+                  <line x1="19" y1="30" x2="19" y2="34"/>
+                  <line x1="45" y1="30" x2="45" y2="34"/>
+                  <line x1="30" y1="19" x2="34" y2="19"/>
+                  <line x1="30" y1="45" x2="34" y2="45"/>
+                </svg>
+              </div>
+              <p class="drop-text">Seret &amp; Lepas File</p>
+              <p class="drop-hint">CSV atau XLSX</p>
+            </div>
+            <div class="upload-features">
+              <div class="upload-feature-item">
+                <div class="feature-icon-svg">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z"/></svg>
+                </div>
+                <div>
+                  <div class="feature-title">Auto-Visualisasi</div>
+                  <div class="feature-desc">Grafik terbuat otomatis</div>
+                </div>
+              </div>
+              <div class="upload-feature-item">
+                <div class="feature-icon-svg">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+                </div>
+                <div>
+                  <div class="feature-title">Deteksi Inventaris</div>
+                  <div class="feature-desc">Kolom jaringan dikenali</div>
+                </div>
+              </div>
+              <div class="upload-feature-item">
+                <div class="feature-icon-svg">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+                </div>
+                <div>
+                  <div class="feature-title">Real-time</div>
+                  <div class="feature-desc">Proses instan di browser</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── DASHBOARD (hidden until data loaded) ── -->
+      <div class="dashboard hidden" id="dashboard">
+
+        <!-- KPI CARDS -->
+        <section class="kpi-section" id="kpiSection">
+          <div class="kpi-grid" id="kpiGrid">
+            <!-- filled by JS -->
+          </div>
+        </section>
+
+        <!-- TABS -->
+        <div class="tabs-wrap">
+          <nav class="tabs" id="tabsNav" role="tablist">
+            <button class="tab active" data-tab="overview" role="tab" aria-selected="true" id="tab-overview">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path d="M2 4a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2z"/></svg>
+              Overview
+            </button>
+            <button class="tab" data-tab="charts" role="tab" aria-selected="false" id="tab-charts">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z"/></svg>
+              Visualisasi
+            </button>
+            <button class="tab" data-tab="table" role="tab" aria-selected="false" id="tab-table">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z" clip-rule="evenodd"/></svg>
+              Data Tabel
+            </button>
+            <button class="tab" data-tab="config" role="tab" aria-selected="false" id="tab-config">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+              Konfigurasi
+            </button>
+          </nav>
+          <div class="tabs-right">
+            <span class="data-file-info" id="dataFileInfo"></span>
+          </div>
+        </div>
+
+        <!-- ── TAB: OVERVIEW ── -->
+        <div class="tab-panel active" id="panel-overview">
+          <div class="overview-grid">
+
+            <!-- Inventory Charts Row -->
+            <div class="inv-charts-row">
+
+              <!-- Status Distribution (Donut) -->
+              <div class="chart-card inv-chart-card" id="invChartStatus">
+                <div class="chart-card-header">
+                  <div>
+                    <h3 class="chart-card-title">Distribusi Status</h3>
+                    <p class="chart-card-desc">Kondisi perangkat jaringan</p>
+                  </div>
+                  <button class="btn-download" id="btnDlStatus" title="Unduh gambar">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Unduh
+                  </button>
+                </div>
+                <div class="chart-canvas-wrap chart-canvas-wrap--donut">
+                  <canvas id="statusChart"></canvas>
+                </div>
+                <div class="no-col-notice hidden" id="noStatusCol">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                  Pilih kolom Status di tab Konfigurasi
+                </div>
+              </div>
+
+              <!-- Device Type (Horizontal Bar) -->
+              <div class="chart-card inv-chart-card" id="invChartType">
+                <div class="chart-card-header">
+                  <div>
+                    <h3 class="chart-card-title">Tipe Perangkat</h3>
+                    <p class="chart-card-desc">Jumlah per kategori perangkat</p>
+                  </div>
+                  <button class="btn-download" id="btnDlType" title="Unduh gambar">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Unduh
+                  </button>
+                </div>
+                <div class="chart-canvas-wrap chart-canvas-wrap--hbar">
+                  <canvas id="typeChart"></canvas>
+                </div>
+                <div class="no-col-notice hidden" id="noTypeCol">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                  Pilih kolom Tipe di tab Konfigurasi
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Location Distribution (Bar) -->
+            <div class="chart-card" id="invChartLocation">
+              <div class="chart-card-header">
+                <div>
+                  <h3 class="chart-card-title">Distribusi Lokasi</h3>
+                  <p class="chart-card-desc">Jumlah perangkat per lokasi / site</p>
+                </div>
+                <button class="btn-download" id="btnDlLocation" title="Unduh gambar">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                  Unduh
+                </button>
+              </div>
+              <div class="chart-canvas-wrap" style="height:320px;">
+                <canvas id="locationChart"></canvas>
+              </div>
+              <div class="no-col-notice hidden" id="noLocationCol">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                Pilih kolom Lokasi di tab Konfigurasi
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── TAB: CHARTS (Custom Visualisasi) ── -->
+        <div class="tab-panel hidden" id="panel-charts">
+          <!-- CONTROL SECTION -->
+          <div class="control-card" id="controlSection">
+            <h3 class="control-title">Konfigurasi Grafik Kustom</h3>
+            <div class="control-grid">
+              <div class="control-field">
+                <label class="field-label" for="labelCol">Kolom Label (Sumbu X / Kategori)</label>
+                <select class="field-select" id="labelCol"></select>
+              </div>
+              <div class="control-field">
+                <label class="field-label" for="valueCol">Kolom Nilai (Sumbu Y / Data)</label>
+                <select class="field-select" id="valueCol"></select>
+              </div>
+              <div class="control-field">
+                <label class="field-label" for="chartType">Tipe Grafik</label>
+                <select class="field-select" id="chartType">
+                  <option value="all">Tampilkan Semua Grafik</option>
+                  <option value="bar">Bar Chart saja</option>
+                  <option value="line">Line Chart saja</option>
+                  <option value="pie">Pie Chart saja</option>
+                </select>
+              </div>
+              <div class="control-actions">
+                <button class="btn-primary" id="btnRender">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg>
+                  Buat Grafik
+                </button>
+                <button class="btn-secondary" id="btnReset">Reset</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATS SUMMARY -->
+          <section class="stats-section" id="statsSection">
+            <div class="stats-grid" id="statsGrid">
+              <div class="stat-card">
+                <div class="stat-label">Total Baris</div>
+                <div class="stat-value" id="statRows">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Total Kolom</div>
+                <div class="stat-value" id="statCols">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Nilai Tertinggi</div>
+                <div class="stat-value" id="statMax">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Nilai Terendah</div>
+                <div class="stat-value" id="statMin">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Rata-rata</div>
+                <div class="stat-value" id="statAvg">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="statSum">-</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- CHARTS AREA -->
+          <section class="charts-area hidden" id="chartsArea">
+            <div class="chart-row" id="rowBarLine">
+              <!-- BAR CHART -->
+              <div class="chart-card" id="wrapBar">
+                <div class="chart-card-header">
+                  <div>
+                    <h3 class="chart-card-title">Bar Chart</h3>
+                    <p class="chart-card-desc">Perbandingan nilai antar kategori</p>
+                  </div>
+                  <button class="btn-download" id="btnDlBar" title="Unduh gambar">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Unduh
+                  </button>
+                </div>
+                <div class="chart-canvas-wrap">
+                  <canvas id="barChart"></canvas>
+                </div>
+              </div>
+              <!-- LINE CHART -->
+              <div class="chart-card" id="wrapLine">
+                <div class="chart-card-header">
+                  <div>
+                    <h3 class="chart-card-title">Line Chart</h3>
+                    <p class="chart-card-desc">Tren data dari waktu ke waktu</p>
+                  </div>
+                  <button class="btn-download" id="btnDlLine" title="Unduh gambar">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Unduh
+                  </button>
+                </div>
+                <div class="chart-canvas-wrap">
+                  <canvas id="lineChart"></canvas>
+                </div>
+              </div>
+            </div>
+            <!-- PIE CHART -->
+            <div class="chart-row chart-row-single" id="rowPie">
+              <div class="chart-card chart-card-pie" id="wrapPie">
+                <div class="chart-card-header">
+                  <div>
+                    <h3 class="chart-card-title">Pie Chart</h3>
+                    <p class="chart-card-desc">Proporsi setiap kategori terhadap total</p>
+                  </div>
+                  <button class="btn-download" id="btnDlPie" title="Unduh gambar">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Unduh
+                  </button>
+                </div>
+                <div class="chart-canvas-wrap chart-canvas-wrap--pie">
+                  <canvas id="pieChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ── TAB: DATA TABLE ── -->
+        <div class="tab-panel hidden" id="panel-table">
+          <div class="table-toolbar">
+            <div class="table-toolbar-left">
+              <h3 class="table-title">Data Inventaris</h3>
+              <span class="table-badge" id="tableBadge">0 baris</span>
+            </div>
+            <div class="table-toolbar-right">
+              <div class="search-wrap">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" class="search-icon">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                </svg>
+                <input type="text" class="search-input" id="tableSearch" placeholder="Cari data..." />
+              </div>
+              <button class="btn-export" id="btnExportCSV" title="Export ke CSV">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                Export CSV
               </button>
             </div>
-            <div class="chart-canvas-wrap">
-              <canvas id="barChart"></canvas>
-            </div>
           </div>
-
-          <!-- LINE CHART -->
-          <div class="chart-card" id="wrapLine">
-            <div class="chart-card-header">
-              <div>
-                <h3 class="chart-card-title">Line Chart</h3>
-                <p class="chart-card-desc">Tren data dari waktu ke waktu</p>
+          <div class="table-card">
+            <div class="table-scroll">
+              <table class="data-table" id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+            <div class="table-pagination" id="tablePagination">
+              <span class="pagination-info" id="paginationInfo"></span>
+              <div class="pagination-btns">
+                <button class="btn-page" id="btnPrevPage" disabled>‹ Prev</button>
+                <div class="page-nums" id="pageNums"></div>
+                <button class="btn-page" id="btnNextPage">Next ›</button>
               </div>
-              <button class="btn-download" id="btnDlLine" title="Unduh gambar">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                  <path fill-rule="evenodd"
-                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
-                </svg>
-                Unduh
-              </button>
-            </div>
-            <div class="chart-canvas-wrap">
-              <canvas id="lineChart"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- PIE CHART -->
-        <div class="chart-row chart-row-single" id="rowPie">
-          <div class="chart-card chart-card-pie" id="wrapPie">
-            <div class="chart-card-header">
-              <div>
-                <h3 class="chart-card-title">Pie Chart</h3>
-                <p class="chart-card-desc">Proporsi setiap kategori terhadap total</p>
+        <!-- ── TAB: CONFIG (Inventory Column Mapping) ── -->
+        <div class="tab-panel hidden" id="panel-config">
+          <div class="config-grid">
+            <div class="config-card">
+              <div class="config-card-header">
+                <div>
+                  <h3 class="config-card-title">Pemetaan Kolom Inventaris</h3>
+                  <p class="config-card-desc">Tentukan kolom mana yang mewakili data inventaris jaringan</p>
+                </div>
               </div>
-              <button class="btn-download" id="btnDlPie" title="Unduh gambar">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                  <path fill-rule="evenodd"
-                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
-                </svg>
-                Unduh
-              </button>
+              <div class="config-fields">
+                <div class="config-field">
+                  <label class="field-label" for="cfgColDevice">Nama Perangkat / Hostname</label>
+                  <select class="field-select" id="cfgColDevice">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label class="field-label" for="cfgColStatus">Status Perangkat</label>
+                  <select class="field-select" id="cfgColStatus">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label class="field-label" for="cfgColType">Tipe / Kategori Perangkat</label>
+                  <select class="field-select" id="cfgColType">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label class="field-label" for="cfgColLocation">Lokasi / Site</label>
+                  <select class="field-select" id="cfgColLocation">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label class="field-label" for="cfgColIP">Alamat IP</label>
+                  <select class="field-select" id="cfgColIP">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label class="field-label" for="cfgColVendor">Vendor / Merek</label>
+                  <select class="field-select" id="cfgColVendor">
+                    <option value="">— Tidak dipetakan —</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-actions">
+                <button class="btn-primary" id="btnApplyConfig">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                  Terapkan Konfigurasi
+                </button>
+                <button class="btn-secondary" id="btnAutoDetect">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+                  Auto-Deteksi
+                </button>
+              </div>
             </div>
-            <div class="chart-canvas-wrap chart-canvas-wrap--pie">
-              <canvas id="pieChart"></canvas>
+
+            <div class="config-card config-info-card">
+              <div class="config-card-header">
+                <div>
+                  <h3 class="config-card-title">Informasi File</h3>
+                  <p class="config-card-desc">Detail file yang sedang dimuat</p>
+                </div>
+              </div>
+              <div class="file-info-list" id="fileInfoList">
+                <!-- Filled by JS -->
+              </div>
+              <div class="column-list-wrap">
+                <h4 class="col-list-title">Kolom Tersedia</h4>
+                <div class="column-chips" id="columnChips">
+                  <!-- Filled by JS -->
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-      </section>
-
-      <!-- DATA TABLE PREVIEW -->
-      <section class="table-section hidden" id="tableSection">
-        <div class="table-card">
-          <div class="table-header">
-            <h3 class="table-title">Pratinjau Data</h3>
-            <span class="table-badge" id="tableBadge">0 baris</span>
-          </div>
-          <div class="table-scroll">
-            <table class="data-table" id="dataTable">
-              <thead id="tableHead"></thead>
-              <tbody id="tableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      </div><!-- /dashboard -->
 
     </div>
   </main>
 
-  <!-- FOOTER -->
+  <!-- ═══════════════════════════════════════════════════════ FOOTER -->
   <footer class="footer">
     <div class="container">
-      <p>Data Visualizer &mdash;</p>
+      <div class="footer-inner">
+        <p>NetInventory &mdash; Dashboard Inventaris Jaringan</p>
+        <p class="footer-version">v2.0 · Data diproses lokal di browser Anda</p>
+      </div>
     </div>
   </footer>
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
+
+  <!-- LOADING OVERLAY -->
+  <div class="loading-overlay hidden" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Memproses file...</p>
+  </div>
 
   <script src="app.js"></script>
 </body>
