@@ -82,7 +82,7 @@ const dropZone         = $('dropZone');
 const uploadSection    = $('uploadSection');
 const dashboard        = $('dashboard');
 const headerStatus     = $('headerStatus');
-const statusDot        = $('statusDot');
+const statusDot        = $('statusDot'); // may be null in simplified HTML
 const btnHeaderReset   = $('btnHeaderReset');
 const loadingOverlay   = $('loadingOverlay');
 const toast            = $('toast');
@@ -153,7 +153,7 @@ dropZone.addEventListener('drop', (e) => {
   if (file && isValidFile(file.name)) {
     processFile(file);
   } else {
-    showToast('⚠️ Hanya file .csv atau .xlsx yang diterima');
+    showToast('Hanya file .csv atau .xlsx yang diterima');
   }
 });
 
@@ -216,13 +216,13 @@ $('btnNextPage').addEventListener('click', () => {
 
 // ─── FILE VALIDATION ──────────────────────────────────────────────────
 function isValidFile(name) {
-  return /\.(csv|xlsx)$/i.test(name);
+  return /\.(csv|xlsx|xls)$/i.test(name);
 }
 
 // ─── PROCESS FILE ────────────────────────────────────────────────────
 function processFile(file) {
   if (!isValidFile(file.name)) {
-    showToast('⚠️ Hanya file .csv atau .xlsx yang diterima');
+    showToast('Hanya file .csv atau .xlsx yang diterima');
     return;
   }
 
@@ -231,53 +231,111 @@ function processFile(file) {
 
   const ext = file.name.split('.').pop().toLowerCase();
 
-  if (ext === 'xlsx') {
+  if (ext === 'xlsx' || ext === 'xls') {
     const reader = new FileReader();
+    reader.onerror = () => {
+      showToast('Gagal membaca file — pastikan file tidak sedang dibuka di aplikasi lain');
+      loadingOverlay.classList.add('hidden');
+    };
     reader.onload = (e) => {
       try {
         const { data, cols } = parseXLSX(e.target.result);
-        if (!data.length) { showToast('File XLSX kosong atau tidak valid'); loadingOverlay.classList.add('hidden'); return; }
+        if (!data.length) {
+          showToast('File Excel kosong atau formatnya tidak didukung');
+          loadingOverlay.classList.add('hidden');
+          return;
+        }
         onDataLoaded(data, cols);
       } catch (err) {
-        showToast('Gagal memproses file XLSX');
-        console.error(err);
+        showToast('Gagal memproses file Excel: ' + err.message);
+        console.error('[XLSX Error]', err);
         loadingOverlay.classList.add('hidden');
       }
     };
     reader.readAsArrayBuffer(file);
   } else {
     const reader = new FileReader();
+    reader.onerror = () => {
+      showToast('Gagal membaca file CSV');
+      loadingOverlay.classList.add('hidden');
+    };
     reader.onload = (e) => {
       try {
         const { data, cols } = parseCSV(e.target.result);
-        if (!data.length) { showToast('File CSV kosong atau tidak valid'); loadingOverlay.classList.add('hidden'); return; }
+        if (!data.length) {
+          showToast('File CSV kosong atau formatnya tidak didukung');
+          loadingOverlay.classList.add('hidden');
+          return;
+        }
         onDataLoaded(data, cols);
       } catch (err) {
-        showToast('Gagal memproses file CSV');
-        console.error(err);
+        showToast('Gagal memproses file CSV: ' + err.message);
+        console.error('[CSV Error]', err);
         loadingOverlay.classList.add('hidden');
       }
     };
+    // Try UTF-8 first, fallback to latin1 handled in parseCSV
     reader.readAsText(file, 'UTF-8');
   }
 }
 
 // ─── XLSX PARSER ─────────────────────────────────────────────────────
 function parseXLSX(arrayBuffer) {
-  const workbook  = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet     = workbook.Sheets[sheetName];
-  const rows      = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  // Read with cellDates to handle date cells, and raw:false to stringify everything
+  const workbook = XLSX.read(arrayBuffer, {
+    type: 'array',
+    cellDates: true,
+    cellNF: false,
+    raw: false,
+  });
+
+  if (!workbook.SheetNames.length) throw new Error('Tidak ada sheet ditemukan dalam file');
+
+  // Find the first non-empty sheet
+  let sheet = null;
+  let usedSheetName = '';
+  for (const name of workbook.SheetNames) {
+    const s = workbook.Sheets[name];
+    if (s && s['!ref']) { sheet = s; usedSheetName = name; break; }
+  }
+  if (!sheet) throw new Error('Semua sheet dalam file kosong');
+
+  // Convert to row arrays
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: '',
+    blankrows: false,
+  });
+
   if (!rows.length) return { data: [], cols: [] };
-  const cols = rows[0].map((h) => String(h).trim());
+
+  // First row = headers; skip empty header cells
+  const rawHeaders = rows[0];
+  const cols = rawHeaders.map((h, i) => {
+    const s = String(h == null ? '' : h).trim();
+    return s || `Kolom_${i + 1}`;
+  });
+
   const data = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    if (row.every((c) => c === '' || c == null)) continue;
+    // Skip fully-empty rows
+    if (!row || row.every((c) => c === '' || c == null)) continue;
     const obj = {};
-    cols.forEach((col, idx) => { obj[col] = row[idx] !== undefined && row[idx] !== null ? String(row[idx]).trim() : ''; });
+    cols.forEach((col, idx) => {
+      const val = row[idx];
+      if (val == null || val === '') {
+        obj[col] = '';
+      } else if (val instanceof Date) {
+        // Format dates as YYYY-MM-DD
+        obj[col] = val.toISOString().slice(0, 10);
+      } else {
+        obj[col] = String(val).trim();
+      }
+    });
     data.push(obj);
   }
+
   return { data, cols };
 }
 
@@ -332,7 +390,7 @@ function onDataLoaded(data, cols) {
   dashboard.classList.remove('hidden');
 
   // Header
-  statusDot.classList.add('active');
+  if (statusDot) statusDot.classList.add('active');
   headerStatus.textContent = `${data.length.toLocaleString('id-ID')} perangkat · ${cols.length} kolom`;
   btnHeaderReset.classList.remove('hidden');
   dataFileInfo.textContent = currentFile.name;
@@ -1170,7 +1228,7 @@ function resetAll() {
   dashboard.classList.add('hidden');
   uploadSection.classList.remove('hidden');
   chartsArea.classList.add('hidden');
-  statusDot.classList.remove('active');
+  if (statusDot) statusDot.classList.remove('active');
   headerStatus.textContent = 'Belum ada data dimuat';
   btnHeaderReset.classList.add('hidden');
   dataFileInfo.textContent = '';
