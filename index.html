@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pengvisualisasi Datamu</title>
   <meta name="description"
-    content="Dashboard inventaris jaringan: unggah data CSV/XLSX dan visualisasikan perangkat, status, dan metrik secara otomatis." />
+    content="Dashboard inventaris jaringan: unggah data CSV/XLSX dan visualisasikan perangkat, status, dan metrik secara noteis." />
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -232,12 +232,14 @@
             </div>
             <div class="table-toolbar-right">
               <input type="text" class="search-input" id="tableSearch" placeholder="Cari data..." />
+              <button class="btn-danger hidden" id="btnDeleteSelected">Hapus Terpilih (0)</button>
               <button class="btn-secondary" id="btnToggleEditTable">Edit Data</button>
               <button class="btn-secondary" id="btnExportCSV">Export CSV</button>
             </div>
           </div>
           <div class="table-edit-notice hidden" id="tableEditNotice">
-            <span><strong>Mode Edit</strong></span>
+            <span><strong>Mode Edit Aktif:</strong> Klik sel untuk me-edit data, centang kotak di sisi kiri untuk
+              memilih dan menghapus beberapa data sekaligus.</span>
           </div>
           <div class="table-card">
             <div class="table-scroll">

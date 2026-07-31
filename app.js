@@ -1,15 +1,4 @@
-/* =====================================================================
-   NETINVENTORY — APP.JS
-   Dashboard Inventaris Jaringan
-   Fitur: CSV/XLSX Upload, Auto-detect inventory columns,
-          KPI Cards, Status/Type/Location Charts,
-          Custom Bar/Line/Pie Charts, Searchable Table,
-          Pagination, Sortable columns, Export CSV
-   ===================================================================== */
-
 'use strict';
-
-// ─── DATA STORE ──────────────────────────────────────────────────────
 let parsedData = [];
 let filteredData = [];
 let columns = [];
@@ -28,12 +17,25 @@ let invCols = {
 // Chart instances
 let chartInstances = { bar: null, line: null, pie: null, status: null, type: null, location: null };
 
-// Pagination state
+// Pagination & Table Edit state
 const PAGE_SIZE = 20;
 let currentPage = 1;
 let sortCol = null;
 let sortDir = 'asc';
 let searchQuery = '';
+let selectedRowsSet = new Set();
+
+function updateDeleteSelectedBtn() {
+  const btn = $('btnDeleteSelected');
+  if (!btn) return;
+  const count = selectedRowsSet.size;
+  btn.textContent = `Hapus Terpilih (${count})`;
+  if (isTableEditMode && count > 0) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
 
 // ─── COLOR PALETTE ───────────────────────────────────────────────────
 const PALETTE = [
@@ -222,10 +224,31 @@ btnToggleEditTable.addEventListener('click', () => {
   const notice = $('tableEditNotice');
   if (notice) notice.classList.toggle('hidden', !isTableEditMode);
 
+  if (!isTableEditMode) {
+    selectedRowsSet.clear();
+  }
+  updateDeleteSelectedBtn();
+
   showToast(isTableEditMode ? 'Mode Edit' : 'Mode Edit dimatikan');
   buildTableHead();
   renderTablePage();
 });
+
+const btnDeleteSelected = $('btnDeleteSelected');
+if (btnDeleteSelected) {
+  btnDeleteSelected.addEventListener('click', () => {
+    if (selectedRowsSet.size === 0) return;
+    const count = selectedRowsSet.size;
+    if (confirm(`Apakah Anda yakin ingin menghapus ${count} baris data terpilih?`)) {
+      parsedData = parsedData.filter((r) => !selectedRowsSet.has(r));
+      selectedRowsSet.clear();
+      updateDeleteSelectedBtn();
+      onTableDataModified();
+      applyFilter();
+      showToast(`${count} baris data berhasil dihapus`);
+    }
+  });
+}
 
 $('btnExportCSV').addEventListener('click', exportCSV);
 
@@ -399,11 +422,33 @@ function splitCSVLine(line) {
   return result;
 }
 
+// ─── SEQUENCE / NO COLUMN AUTO-REINDEXING ────────────────────────────
+function isSequenceColumn(colName) {
+  if (!colName) return false;
+  const clean = String(colName).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean === 'no' || clean === 'nomor' || clean === 'nourut' || clean === 'no_urut' || clean === 'id';
+}
+
+function reindexSequenceColumns() {
+  if (!parsedData || !parsedData.length || !columns || !columns.length) return;
+  const seqCols = columns.filter(isSequenceColumn);
+  if (seqCols.length > 0) {
+    parsedData.forEach((row, index) => {
+      seqCols.forEach((col) => {
+        row[col] = index + 1;
+      });
+    });
+  }
+}
+
 // ─── ON DATA LOADED ───────────────────────────────────────────────────
 function onDataLoaded(data, cols) {
   parsedData = data;
   columns = cols;
-  filteredData = [...data];
+  selectedRowsSet.clear();
+  updateDeleteSelectedBtn();
+  reindexSequenceColumns();
+  filteredData = [...parsedData];
   currentFile.rows = data.length;
   currentPage = 1;
   sortCol = null;
@@ -445,6 +490,7 @@ function onDataLoaded(data, cols) {
 }
 
 // ─── INPUT FORM DYNAMIC GENERATION ────────────────────────────────────
+// ─── INPUT FORM DYNAMIC GENERATION ────────────────────────────────────
 function renderInputForm() {
   inputFieldsGrid.innerHTML = '';
   if (!columns || !columns.length) return;
@@ -453,45 +499,62 @@ function renderInputForm() {
     const fieldWrap = document.createElement('div');
     fieldWrap.className = 'input-field';
 
+    const isSeq = isSequenceColumn(col);
+
     const label = document.createElement('label');
     label.className = 'field-label';
     label.setAttribute('for', `input-col-${idx}`);
-    label.textContent = col;
+    label.textContent = isSeq ? `${col} (Otomatis)` : col;
 
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'input-control';
     input.id = `input-col-${idx}`;
     input.name = col;
-    input.placeholder = `Masukkan ${col}...`;
+
+    if (isSeq) {
+      input.value = parsedData.length + 1;
+      input.readOnly = true;
+      input.style.backgroundColor = '#f1f5f9';
+      input.style.cursor = 'not-allowed';
+      input.title = 'Nomor urut diisi otomatis oleh sistem';
+    } else {
+      input.placeholder = `Masukkan ${col}...`;
+    }
 
     // Create datalist for autocompletion of existing non-empty values
-    const listId = `datalist-col-${idx}`;
-    const datalist = document.createElement('datalist');
-    datalist.id = listId;
+    if (!isSeq) {
+      const listId = `datalist-col-${idx}`;
+      const datalist = document.createElement('datalist');
+      datalist.id = listId;
 
-    const uniqueVals = new Set();
-    parsedData.forEach((row) => {
-      const val = row[col];
-      if (val !== undefined && val !== null && String(val).trim() !== '') {
-        uniqueVals.add(String(val).trim());
-      }
-    });
-
-    if (uniqueVals.size > 0 && uniqueVals.size <= 50) {
-      uniqueVals.forEach((v) => {
-        const opt = document.createElement('option');
-        opt.value = v;
-        datalist.appendChild(opt);
+      const uniqueVals = new Set();
+      parsedData.forEach((row) => {
+        const val = row[col];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          uniqueVals.add(String(val).trim());
+        }
       });
-      input.setAttribute('list', listId);
+
+      if (uniqueVals.size > 0 && uniqueVals.size <= 50) {
+        uniqueVals.forEach((v) => {
+          const opt = document.createElement('option');
+          opt.value = v;
+          datalist.appendChild(opt);
+        });
+        input.setAttribute('list', listId);
+      }
+
+      fieldWrap.appendChild(label);
+      fieldWrap.appendChild(input);
+      if (datalist.children.length > 0) {
+        fieldWrap.appendChild(datalist);
+      }
+    } else {
+      fieldWrap.appendChild(label);
+      fieldWrap.appendChild(input);
     }
 
-    fieldWrap.appendChild(label);
-    fieldWrap.appendChild(input);
-    if (datalist.children.length > 0) {
-      fieldWrap.appendChild(datalist);
-    }
     inputFieldsGrid.appendChild(fieldWrap);
   });
 }
@@ -505,21 +568,26 @@ function handleAddNewData(e) {
 
   const formData = new FormData(inputDataForm);
   const newRow = {};
-  let hasAnyValue = false;
+  let hasOtherFieldValues = false;
 
   columns.forEach((col) => {
-    const val = (formData.get(col) || '').toString().trim();
-    newRow[col] = val;
-    if (val !== '') hasAnyValue = true;
+    if (isSequenceColumn(col)) {
+      newRow[col] = parsedData.length + 1;
+    } else {
+      const val = (formData.get(col) || '').toString().trim();
+      newRow[col] = val;
+      if (val !== '') hasOtherFieldValues = true;
+    }
   });
 
-  if (!hasAnyValue) {
-    showToast('Mohon isi minimal satu kolom data');
+  if (!hasOtherFieldValues) {
+    showToast('data masih kosong');
     return;
   }
 
   // Add to dataset
   parsedData.push(newRow);
+  reindexSequenceColumns();
   filteredData = [...parsedData];
   currentFile.rows = parsedData.length;
 
@@ -1226,6 +1294,36 @@ function renderStats(valCol, overrideValues = null) {
 // ─── TABLE ────────────────────────────────────────────────────────────
 function buildTableHead() {
   const tr = document.createElement('tr');
+
+  if (isTableEditMode) {
+    const thSelect = document.createElement('th');
+    thSelect.style.width = '40px';
+    thSelect.style.textAlign = 'center';
+
+    const chkAll = document.createElement('input');
+    chkAll.type = 'checkbox';
+    chkAll.id = 'selectAllRows';
+    chkAll.title = 'Pilih Semua Baris di Halaman Ini';
+
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, filteredData.length);
+    const pageData = filteredData.slice(start, end);
+    chkAll.checked = pageData.length > 0 && pageData.every((r) => selectedRowsSet.has(r));
+
+    chkAll.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      pageData.forEach((r) => {
+        if (isChecked) selectedRowsSet.add(r);
+        else selectedRowsSet.delete(r);
+      });
+      renderTablePage();
+      updateDeleteSelectedBtn();
+    });
+
+    thSelect.appendChild(chkAll);
+    tr.appendChild(thSelect);
+  }
+
   columns.forEach((col) => {
     const th = document.createElement('th');
     th.textContent = col;
@@ -1295,6 +1393,36 @@ function renderTablePage() {
   pageData.forEach((row) => {
     const tr = document.createElement('tr');
     const parsedIdx = parsedData.indexOf(row);
+    if (selectedRowsSet.has(row)) tr.classList.add('row-selected');
+
+    if (isTableEditMode) {
+      const tdSelect = document.createElement('td');
+      tdSelect.style.textAlign = 'center';
+
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'row-checkbox';
+      chk.checked = selectedRowsSet.has(row);
+
+      chk.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          selectedRowsSet.add(row);
+          tr.classList.add('row-selected');
+        } else {
+          selectedRowsSet.delete(row);
+          tr.classList.remove('row-selected');
+        }
+        updateDeleteSelectedBtn();
+
+        const chkAll = $('selectAllRows');
+        if (chkAll) {
+          chkAll.checked = pageData.length > 0 && pageData.every((r) => selectedRowsSet.has(r));
+        }
+      });
+
+      tdSelect.appendChild(chk);
+      tr.appendChild(tdSelect);
+    }
 
     columns.forEach((c) => {
       const td = document.createElement('td');
@@ -1375,6 +1503,7 @@ function renderTablePage() {
 }
 
 function onTableDataModified() {
+  reindexSequenceColumns();
   currentFile.rows = parsedData.length;
   headerStatus.textContent = `${parsedData.length.toLocaleString('id-ID')} perangkat · ${columns.length} kolom`;
   buildKPI();
@@ -1472,6 +1601,8 @@ function resetAll() {
   tabPanels.forEach((p, i) => p.classList.toggle('hidden', i !== 0));
 
   isTableEditMode = false;
+  selectedRowsSet.clear();
+  updateDeleteSelectedBtn();
   if (btnToggleEditTable) {
     btnToggleEditTable.classList.remove('active');
     btnToggleEditTable.textContent = 'Edit Data';

@@ -1,9 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════
-   PENGVISUALISASI DATAMU — STYLE.CSS
-   Tema terang, simpel, bersih — tanpa ikon atau simbol
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* ── RESET ────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -709,6 +703,43 @@ body {
 .btn-delete-row:hover {
   background: #fef2f2;
   border-color: #f87171;
+}
+
+.btn-danger {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.btn-danger.hidden {
+  display: none !important;
+}
+
+.data-table tbody tr.row-selected td {
+  background: #fef2f2 !important;
+}
+
+.data-table tbody tr.row-selected td[contenteditable="true"] {
+  outline-color: #fca5a5;
+}
+
+.row-checkbox, #selectAllRows {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: #dc2626;
 }
 
 /* Status badges */
